@@ -1,3 +1,7 @@
+# DATA315_FinalProject
+Alex, Arnav, Karsten, Gabriel DATA 315 Data Interaction Spring 2026 Final Project
+
+
 # Svelte + Vite
 
 This template should help get you started developing with Svelte in Vite.
@@ -41,5 +45,3 @@ If you have state that's important to retain within a component, consider creati
 import { writable } from 'svelte/store'
 export default writable(0)
 ```
-# DATA315_FinalProject
-Alex, Arnav, Karsten, Gabriel DATA 315 Data Interaction Spring 2026 Final Project

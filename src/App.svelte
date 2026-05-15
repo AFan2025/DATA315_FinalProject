@@ -3,7 +3,21 @@
   import viteLogo from './assets/vite.svg'
   import heroImg from './assets/hero.png'
   import Counter from './lib/Counter.svelte'
+
+  import * as d3 from 'd3';
+  import { onMount } from 'svelte';
 </script>
+
+<div>
+  <input
+      id="initial-slider"
+      class="param-slider"
+      type="range"
+      min=0
+      max=1
+      step=0.01
+  />
+</div>
 
 <section id="center">
   <div class="hero">
