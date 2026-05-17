@@ -1,15 +1,15 @@
-import requests
-import matplotlib.pyplot as plt
-from PIL import Image
-from io import BytesIO
-import json
+from fastapi import FastAPI
+from pydantic import BaseModel
+from typing import List, Optional
 import numpy as np
 import scipy.sparse
 import faiss
 import os
-import sys
+import json
 
-DATA_PATH = "../data/"
+app = FastAPI(title="slice-backend-api", version="1.0.0")
+
+DATA_PATH = "/Users/alexfan/Desktop/Root/UCHI/Masters/Q3/Data-Interaction/DATA315_Final/splice-vis-website/data/"
 
 clip_embeddings     = np.load(os.path.join(DATA_PATH, "clip_embeddings.npy"))
 concept_embeddings  = np.load(os.path.join(DATA_PATH, "concept_embeddings.npy"))
@@ -25,13 +25,31 @@ with open(os.path.join(DATA_PATH, "image_urls.json")) as f:
 
 vocab_index = {word: i for i, word in enumerate(vocab)}  # fast lookup
 
-# Query helpers — this is the logic the backend will run
+class Image(BaseModel):
+    image_id: str
+    score: float
+    url: str
+    row: int
 
-def build_query_vector(concept_weights: dict) -> np.ndarray:
+class Concept(BaseModel):
+    concept: str
+    mean_weight: float
+    base_freq: float
+    ratio: Optional[float] = None
+
+class ConceptWeights(BaseModel):
+    concept_weights: dict
+
+class SearchResponse(BaseModel):
+    display_results: List[Image]
+    top_concepts: List[Concept]
+    total_above_threshold: int
+
+def build_query_vector(input_weights: ConceptWeights) -> np.ndarray:
     """Weighted sum of concept CLIP embeddings, L2-normalised."""
     q = np.zeros(512, dtype=np.float32)
     missing = []
-    for concept, weight in concept_weights.items():
+    for concept, weight in input_weights.concept_weights.items():
         idx = vocab_index.get(concept)
         if idx is not None:
             q += weight * concept_embeddings[idx]
@@ -40,10 +58,11 @@ def build_query_vector(concept_weights: dict) -> np.ndarray:
     if missing:
         print(f"  Not in vocabulary: {missing}")
     norm = np.linalg.norm(q)
-    return q / norm if norm > 0 else q
+    if norm == 0:
+        raise ValueError("Query vector is zero. All concepts missing or weights invalid.")
+    return q / norm
 
-
-def retrieve(concept_weights: dict, k: int = 20, threshold: float = 0.25):
+def retrieve(concept_weights: ConceptWeights, k: int = 20, threshold: float = 0.25):
     """Return top-k display results and all above-threshold rows for concept analysis.
 
     Returns:
@@ -67,18 +86,20 @@ def retrieve(concept_weights: dict, k: int = 20, threshold: float = 0.25):
     display_results = []
     for score, idx in zip(all_scores[:k], all_idx[:k]):
         img_id = int(image_ids[idx])
-        display_results.append({
-            "image_id": img_id,
-            "score": float(score),
-            "url": image_urls[str(img_id)],
-            "row": int(idx),
-        })
+        output_img = Image(
+            image_id=str(img_id),
+            score=float(score),
+            url=image_urls[str(img_id)],
+            row=int(idx)
+        )
+        display_results.append(output_img)
 
-    print(f"  {len(all_idx):,} images above threshold={threshold} (showing top {min(k, len(all_idx))})")
-    return display_results, list(all_idx)
+    return {
+        'display_results': display_results,
+        'threshold_count': list(all_idx)
+    }
 
-
-def top_concepts(retrieved_rows: list[int], query_concepts: dict, top_n: int = 15):
+def top_concepts(retrieved_rows: list[int], query_concepts: ConceptWeights, top_n: int = 15) -> List[Concept]: 
     """Return top concepts by mean SpLiCE weight in the retrieved set.
 
     Sorted by mean weight (correlation). Enrichment ratio vs baseline shown
@@ -87,7 +108,7 @@ def top_concepts(retrieved_rows: list[int], query_concepts: dict, top_n: int = 1
     sub = splice_weights[retrieved_rows].toarray()  # [N, V]
     mean_w = sub.mean(axis=0)                        # [V]
 
-    for concept in query_concepts:
+    for concept in query_concepts.concept_weights:
         if concept in vocab_index:
             mean_w[vocab_index[concept]] = 0.0
 
@@ -98,52 +119,28 @@ def top_concepts(retrieved_rows: list[int], query_concepts: dict, top_n: int = 1
             break
         base = float(concept_frequencies[i])
         ratio = mean_w[i] / base if base > 0 else None
-        out.append({
-            "concept":     vocab[i],
-            "mean_weight": float(mean_w[i]),
-            "base_freq":   base,
-            "ratio":       ratio,
-        })
+        out.append(Concept(
+            concept=vocab[i],
+            mean_weight=float(mean_w[i]),
+            base_freq=base,
+            ratio=ratio,
+        ))
     return out
 
-def show_results(results, concept_weights, n_cols=5):
-    k = len(results)
-    n_rows = (k + n_cols - 1) // n_cols
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(3 * n_cols, 3 * n_rows))
-    axes = np.array(axes).flatten()
+@app.post("/search")
+async def search(input_weights: ConceptWeights, k: int = 20, threshold: float = 0.25):
+    return retrieve(input_weights, k, threshold)
 
-    for ax, res in zip(axes, results):
-        try:
-            resp = requests.get(res["url"], timeout=5)
-            img  = Image.open(BytesIO(resp.content)).convert("RGB")
-            ax.imshow(img)
-        except Exception:
-            ax.set_facecolor("#eee")
-        ax.set_title(f"{res['score']:.3f}", fontsize=8)
-        ax.axis("off")
+@app.get("/autocomplete")
+async def autocomplete(query: str, limit: int = 10):
+    """Return a list of vocabulary words matching the query."""
+    matches = [word for word in vocab_index if word.startswith(query.lower())]
+    matches.sort(key=len)
+    return {"query": query, "matches": matches[:limit]}
 
-    for ax in axes[k:]:
-        ax.axis("off")
+@app.get("/health")
+async def health():
+    """Health check endpoint."""
+    return {"status": "ok"}
 
-    query_str = ", ".join(f"{c}: {w}" for c, w in concept_weights.items())
-    fig.suptitle(f"Query: {{{query_str}}}", fontsize=11)
-    plt.tight_layout()
-    plt.show()
-
-
-def show_top_concepts(concepts):
-    print(f"{'Concept':25s}  {'Mean weight':>11s}  {'vs baseline':>11s}")
-    print("-" * 52)
-    for c in concepts:
-        ratio_str = f"{c['ratio']:.2f}x" if c["ratio"] is not None else "   n/a"
-        print(f"{c['concept']:25s}  {c['mean_weight']:11.4f}  {ratio_str:>11s}")
-
-
-if __name__ == "__main__":
-    concept_weights = {"woman": 1.0} #This will be determined by the input of the user 
-
-    results, all_rows = retrieve(concept_weights, k=10)
-    show_results(results, concept_weights)
-
-    show_top_concepts(top_concepts(all_rows, concept_weights))
-
+    

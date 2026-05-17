@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+plan-sveltePythonRetrievalArchitecture.prompt.md
+
+# venv
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.uv/
+uv.lock
