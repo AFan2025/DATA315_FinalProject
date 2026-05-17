@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import numpy as np
@@ -7,9 +8,20 @@ import faiss
 import os
 import json
 
-app = FastAPI(title="slice-backend-api", version="1.0.0")
+app = FastAPI(title="splice-vis-api", version="1.0.0")
 
-DATA_PATH = "/Users/alexfan/Desktop/Root/UCHI/Masters/Q3/Data-Interaction/DATA315_Final/splice-vis-website/data/"
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+DATA_PATH = os.environ.get(
+    "DATA_PATH",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "data"),
+)
 
 clip_embeddings     = np.load(os.path.join(DATA_PATH, "clip_embeddings.npy"))
 concept_embeddings  = np.load(os.path.join(DATA_PATH, "concept_embeddings.npy"))
@@ -23,7 +35,8 @@ with open(os.path.join(DATA_PATH, "vocabulary.json")) as f:
 with open(os.path.join(DATA_PATH, "image_urls.json")) as f:
     image_urls = json.load(f)
 
-vocab_index = {word: i for i, word in enumerate(vocab)}  # fast lookup
+vocab_index = {word: i for i, word in enumerate(vocab)}
+
 
 class Image(BaseModel):
     image_id: str
@@ -45,6 +58,7 @@ class SearchResponse(BaseModel):
     top_concepts: List[Concept]
     total_above_threshold: int
 
+
 def build_query_vector(input_weights: ConceptWeights) -> np.ndarray:
     """Weighted sum of concept CLIP embeddings, L2-normalised."""
     q = np.zeros(512, dtype=np.float32)
@@ -59,54 +73,41 @@ def build_query_vector(input_weights: ConceptWeights) -> np.ndarray:
         print(f"  Not in vocabulary: {missing}")
     norm = np.linalg.norm(q)
     if norm == 0:
-        raise ValueError("Query vector is zero. All concepts missing or weights invalid.")
+        raise ValueError("Query vector is zero — all concepts missing or weights invalid.")
     return q / norm
 
-def retrieve(concept_weights: ConceptWeights, k: int = 20, threshold: float = 0.25):
-    """Return top-k display results and all above-threshold rows for concept analysis.
 
-    Returns:
-        display_results: list of top-k dicts with image_id, score, url, row
-        all_rows: list of all row indices with cosine similarity >= threshold
-                  (used for stable concept statistics over a larger pool)
-    """
+def retrieve(concept_weights: ConceptWeights, k: int = 20, threshold: float = 0.25):
     q = build_query_vector(concept_weights)
 
-    # Fetch all images above the threshold for stable concept stats
     lims, distances, indices = faiss_index.range_search(q[None], threshold)
     all_idx = indices[lims[0]:lims[1]]
     all_scores = distances[lims[0]:lims[1]]
 
-    # Sort descending by score
     order = np.argsort(all_scores)[::-1]
     all_idx = all_idx[order]
     all_scores = all_scores[order]
 
-    # Build display results from top-k
     display_results = []
     for score, idx in zip(all_scores[:k], all_idx[:k]):
         img_id = int(image_ids[idx])
-        output_img = Image(
+        display_results.append(Image(
             image_id=str(img_id),
             score=float(score),
             url=image_urls[str(img_id)],
-            row=int(idx)
-        )
-        display_results.append(output_img)
+            row=int(idx),
+        ))
 
     return {
-        'display_results': display_results,
-        'threshold_count': list(all_idx)
+        "display_results": display_results,
+        "all_rows": list(map(int, all_idx)),
     }
 
-def top_concepts(retrieved_rows: list[int], query_concepts: ConceptWeights, top_n: int = 15) -> List[Concept]: 
-    """Return top concepts by mean SpLiCE weight in the retrieved set.
 
-    Sorted by mean weight (correlation). Enrichment ratio vs baseline shown
-    as secondary info but does not affect ordering.
-    """
-    sub = splice_weights[retrieved_rows].toarray()  # [N, V]
-    mean_w = sub.mean(axis=0)                        # [V]
+def top_concepts(retrieved_rows: list[int], query_concepts: ConceptWeights, top_n: int = 15) -> List[Concept]:
+    """Top concepts by mean SpLiCE weight in the retrieved set."""
+    sub = splice_weights[retrieved_rows].toarray()
+    mean_w = sub.mean(axis=0)
 
     for concept in query_concepts.concept_weights:
         if concept in vocab_index:
@@ -118,7 +119,7 @@ def top_concepts(retrieved_rows: list[int], query_concepts: ConceptWeights, top_
         if mean_w[i] <= 0:
             break
         base = float(concept_frequencies[i])
-        ratio = mean_w[i] / base if base > 0 else None
+        ratio = float(mean_w[i] / base) if base > 0 else None
         out.append(Concept(
             concept=vocab[i],
             mean_weight=float(mean_w[i]),
@@ -127,20 +128,26 @@ def top_concepts(retrieved_rows: list[int], query_concepts: ConceptWeights, top_
         ))
     return out
 
-@app.post("/search")
+
+@app.post("/search", response_model=SearchResponse)
 async def search(input_weights: ConceptWeights, k: int = 20, threshold: float = 0.25):
-    return retrieve(input_weights, k, threshold)
+    result = retrieve(input_weights, k, threshold)
+    concepts = top_concepts(result["all_rows"], input_weights) if result["all_rows"] else []
+    return SearchResponse(
+        display_results=result["display_results"],
+        top_concepts=concepts,
+        total_above_threshold=len(result["all_rows"]),
+    )
+
 
 @app.get("/autocomplete")
 async def autocomplete(query: str, limit: int = 10):
-    """Return a list of vocabulary words matching the query."""
+    """Prefix-match vocabulary words."""
     matches = [word for word in vocab_index if word.startswith(query.lower())]
     matches.sort(key=len)
     return {"query": query, "matches": matches[:limit]}
 
+
 @app.get("/health")
 async def health():
-    """Health check endpoint."""
     return {"status": "ok"}
-
-    
