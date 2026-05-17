@@ -168,6 +168,13 @@
     fireSearch(true);
   }
 
+  function normalizeWeights() {
+    const total = addedWords.reduce((s, w) => s + w.weight, 0);
+    if (total <= 0) return;
+    addedWords = addedWords.map(w => ({ ...w, weight: w.weight / total }));
+    fireSearch(true);
+  }
+
   function handleSlider(idx, e) {
     if (addedWords.length <= 1) return;
     const val = Math.max(0, Math.min(1, parseFloat(e.currentTarget.value) || 0));
@@ -206,78 +213,93 @@
 </script>
 
 <div class="qs">
-  <div class="search-wrap">
-    <div class="input-wrap">
+  <label class="search-label" for="concept-search">Search vocabulary</label>
+
+  <div class="search-row">
+    <div class="search-input-wrap">
       <input
+        id="concept-search"
+        class="search-input"
         type="text"
         bind:value={query}
         oninput={handleInput}
         onkeydown={handleKeydown}
         onfocusout={handleBlur}
-        placeholder="Search concepts…"
+        placeholder="Type a concept like cat, house, tie, beard"
         autocomplete="off"
         aria-autocomplete="list"
         aria-controls="ac-list"
       />
       {#if isLoading}
-        <span class="spinner"></span>
+        <span class="search-status">Searching…</span>
       {/if}
     </div>
 
-    {#if isOpen && suggestions.length > 0}
-      <ul id="ac-list" class="dropdown" role="listbox">
-        {#each suggestions as word, i}
-          <li role="option" aria-selected={highlightIdx === i} class:hl={highlightIdx === i}>
-            <button type="button" onmousedown={(ev) => { ev.preventDefault(); choose(word); }}>
-              {word}
-            </button>
-          </li>
-        {/each}
-      </ul>
-    {/if}
+    <button class="btn" type="button" onclick={addWord}>Add</button>
   </div>
 
-  <div class="action-row">
-    <button class="btn btn-primary" type="button" onclick={addWord} disabled={!selectedWord}>
-      Add
-    </button>
-    <button class="btn" type="button" onclick={resetAll} disabled={addedWords.length === 0}>
-      Reset
-    </button>
-    {#if selectedWord}
-      <span class="selected-badge">{selectedWord}</span>
-    {/if}
-  </div>
+  {#if isOpen && suggestions.length > 0}
+    <ul id="ac-list" class="dropdown" role="listbox">
+      {#each suggestions as word, i}
+        <li role="option" aria-selected={highlightIdx === i}>
+          <button
+            type="button"
+            class="dropdown-item"
+            class:selected={highlightIdx === i}
+            onmousedown={(ev) => { ev.preventDefault(); choose(word); }}
+          >
+            {word}
+          </button>
+        </li>
+      {/each}
+    </ul>
+  {/if}
 
   {#if errorMessage}
-    <div class="error">{errorMessage}</div>
+    <p class="inline-error">{errorMessage}</p>
   {/if}
 
   <div class="word-list">
     {#if addedWords.length === 0}
-      <p class="hint">Add concepts to build your query vector.</p>
+      <div class="empty-card">Add concepts to build your query vector.</div>
     {:else}
       {#each addedWords as item, idx (item.word)}
-        <div class="word-item">
-          <div class="word-top">
-            <span class="word-name">{item.word}</span>
-            <button class="remove-btn" type="button" onclick={() => removeWord(idx)} title="Remove">✕</button>
+        <div class="slider-card">
+          <div class="slider-header">
+            <div>
+              <span class="concept-label">{item.word}</span>
+            </div>
+            <div class="slider-actions">
+              <span class="weight-chip">{(item.weight * 100).toFixed(0)}%</span>
+              <button
+                class="icon-btn"
+                type="button"
+                onclick={() => removeWord(idx)}
+                aria-label="Remove {item.word}"
+              >×</button>
+            </div>
           </div>
-          <div class="slider-row">
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.01"
-              value={item.weight}
-              oninput={(e) => handleSlider(idx, e)}
-              disabled={addedWords.length === 1}
-            />
-            <span class="weight-val">{(item.weight * 100).toFixed(0)}%</span>
-          </div>
+          <input
+            class="slider"
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={item.weight}
+            oninput={(e) => handleSlider(idx, e)}
+            disabled={addedWords.length === 1}
+            aria-label="{item.word} weight"
+          />
         </div>
       {/each}
-      <div class="total">Total: {totalWeight.toFixed(4)}</div>
+
+      <div class="list-footer">
+        <span class="total">Σ {totalWeight.toFixed(3)}</span>
+        <div class="footer-actions">
+          <button class="btn btn-sm" type="button" onclick={normalizeWeights}>Normalize</button>
+          <button class="btn btn-sm" type="button" onclick={resetAll}>Reset</button>
+        </div>
+      </div>
     {/if}
   </div>
 </div>
@@ -286,187 +308,192 @@
   .qs {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 0.65rem;
   }
 
-  .search-wrap {
+  .search-label {
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+
+  .search-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.7rem;
+    align-items: start;
+  }
+
+  .search-input-wrap {
     position: relative;
   }
 
-  .input-wrap {
-    position: relative;
-  }
-
-  .input-wrap input {
+  .search-input {
     width: 100%;
-    padding: 8px 10px;
-    padding-right: 32px;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
+    padding: 0.85rem 1rem;
     background: var(--bg-input);
-    color: var(--text);
-    font-size: 14px;
+    color: var(--text-heading);
+    font: inherit;
     outline: none;
-    transition: border-color 0.15s;
+    transition: border-color 140ms ease, box-shadow 140ms ease;
   }
 
-  .input-wrap input:focus {
-    border-color: var(--border-focus);
-    box-shadow: 0 0 0 2px var(--accent-muted);
+  .search-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-muted);
   }
 
-  .spinner {
+  .search-status {
     position: absolute;
-    right: 10px;
+    right: 0.95rem;
     top: 50%;
     transform: translateY(-50%);
-    width: 14px;
-    height: 14px;
-    border: 2px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.6s linear infinite;
-  }
-
-  @keyframes spin {
-    to { transform: translateY(-50%) rotate(360deg); }
+    color: var(--text-secondary);
+    font-size: 0.78rem;
   }
 
   .dropdown {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    margin: 4px 0 0;
-    padding: 4px;
+    margin: 0;
+    padding: 0.4rem;
     list-style: none;
-    background: var(--bg-panel);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
+    background: var(--bg-panel);
     box-shadow: var(--shadow);
-    z-index: 100;
-    max-height: 220px;
+    max-height: 16rem;
     overflow-y: auto;
   }
 
-  .dropdown li button {
-    display: block;
+  .dropdown-item {
     width: 100%;
-    padding: 6px 8px;
     border: none;
-    background: none;
-    color: var(--text);
-    font-size: 13px;
+    border-radius: 0.85rem;
+    padding: 0.7rem 0.9rem;
+    background: transparent;
+    color: var(--text-heading);
+    font: inherit;
     text-align: left;
-    border-radius: 4px;
+    cursor: pointer;
   }
 
-  .dropdown li button:hover,
-  .dropdown li.hl button {
-    background: var(--accent-light);
-    color: var(--accent-hover);
+  .dropdown-item:hover,
+  .dropdown-item.selected {
+    background: var(--bg-muted);
   }
 
-  .action-row {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    flex-wrap: wrap;
-  }
-
-  .selected-badge {
-    font-size: 12px;
-    padding: 2px 8px;
-    border-radius: 99px;
-    background: var(--accent-light);
-    color: var(--accent);
-    font-weight: 500;
-  }
-
-  .error {
+  .inline-error {
+    margin: 0;
+    font-size: 0.86rem;
     color: var(--error);
-    font-size: 12px;
-    background: var(--error-bg);
-    padding: 6px 10px;
-    border-radius: var(--radius-sm);
   }
 
   .word-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 0.55rem;
   }
 
-  .hint {
-    color: var(--text-secondary);
-    font-size: 13px;
-    text-align: center;
-    padding: 24px 0;
-  }
-
-  .word-item {
-    background: var(--bg-muted);
+  .empty-card {
+    border: 1px dashed var(--border-strong);
     border-radius: var(--radius-sm);
-    padding: 8px 10px;
+    padding: 1.2rem 1rem;
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+    line-height: 1.6;
+    text-align: center;
   }
 
-  .word-top {
+  .slider-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.85rem 0.9rem;
+    background: var(--bg-panel);
+    transition: border-color 180ms ease, box-shadow 180ms ease;
+  }
+
+  .slider-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 4px;
+    gap: 0.6rem;
   }
 
-  .word-name {
+  .concept-label {
+    font-size: 0.95rem;
     font-weight: 600;
-    font-size: 13px;
     color: var(--text-heading);
   }
 
-  .remove-btn {
-    width: 20px;
-    height: 20px;
+  .slider-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .weight-chip {
+    min-width: 2.8rem;
+    text-align: center;
+    border-radius: 999px;
+    padding: 0.3rem 0.6rem;
+    background: var(--bg-muted);
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+    font-family: var(--font-mono);
+  }
+
+  .icon-btn {
+    width: 1.8rem;
+    height: 1.8rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    line-height: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    border: none;
-    background: none;
-    color: var(--text-secondary);
-    font-size: 12px;
-    border-radius: 4px;
     padding: 0;
-    line-height: 1;
+    cursor: pointer;
+    transition: background 140ms ease, border-color 140ms ease;
   }
 
-  .remove-btn:hover {
+  .icon-btn:hover {
     background: var(--error-bg);
+    border-color: var(--error);
     color: var(--error);
   }
 
-  .slider-row {
+  .slider {
+    width: 100%;
+  }
+
+  .list-footer {
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: 8px;
-  }
-
-  .slider-row input[type="range"] {
-    flex: 1;
-    height: 6px;
-    margin: 0;
-  }
-
-  .weight-val {
-    font-size: 12px;
-    font-family: var(--font-mono);
-    color: var(--text-secondary);
-    min-width: 32px;
-    text-align: right;
+    padding-top: 0.3rem;
   }
 
   .total {
-    font-size: 11px;
+    font-size: 0.78rem;
     color: var(--text-secondary);
-    text-align: right;
     font-family: var(--font-mono);
+  }
+
+  .footer-actions {
+    display: flex;
+    gap: 0.4rem;
+  }
+
+  .btn-sm {
+    padding: 0.35rem 0.7rem;
+    font-size: 0.78rem;
   }
 </style>

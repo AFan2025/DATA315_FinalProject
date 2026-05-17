@@ -5,77 +5,89 @@
 }
 
 :root {
-  --accent: #7c3aed;
-  --accent-hover: #6d28d9;
-  --accent-light: #ede9fe;
-  --accent-muted: rgba(124, 58, 237, 0.08);
+  --accent: #e36b37;
+  --accent-hover: #cf5a28;
+  --accent-light: rgba(227, 107, 55, 0.10);
+  --accent-muted: rgba(227, 107, 55, 0.05);
 
-  --text: #374151;
-  --text-secondary: #6b7280;
-  --text-heading: #111827;
-  --text-inverse: #ffffff;
+  --text: #41352e;
+  --text-secondary: #8a7d75;
+  --text-heading: #1a1009;
+  --text-inverse: #fffbf7;
 
-  --bg: #f8fafc;
+  --bg: #faf6f1;
   --bg-panel: #ffffff;
   --bg-input: #ffffff;
-  --bg-hover: #f3f4f6;
-  --bg-muted: #f1f5f9;
+  --bg-hover: #f3ede6;
+  --bg-muted: #f5f0ea;
 
-  --border: #e5e7eb;
+  --border: #e8e0d8;
+  --border-strong: #d4cac0;
   --border-focus: var(--accent);
 
-  --error: #ef4444;
-  --error-bg: #fef2f2;
-  --success: #10b981;
+  --error: #c4421a;
+  --error-bg: rgba(196, 66, 26, 0.07);
+  --success: #2e7d52;
 
-  --radius: 8px;
-  --radius-sm: 6px;
+  --radius: 1rem;
+  --radius-sm: 0.7rem;
+  --radius-xs: 0.4rem;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-sm: 0 1px 3px rgba(26, 16, 9, 0.06);
+  --shadow: 0 4px 16px rgba(26, 16, 9, 0.08);
 
-  --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-heading: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", Consolas, monospace;
 
   font-family: var(--font);
   font-size: 14px;
   line-height: 1.5;
+  font-weight: 400;
   color: var(--text);
   background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --accent: #a78bfa;
-    --accent-hover: #8b5cf6;
-    --accent-light: rgba(167, 139, 250, 0.15);
-    --accent-muted: rgba(167, 139, 250, 0.06);
+    --accent: #e87a4a;
+    --accent-hover: #f08b5e;
+    --accent-light: rgba(232, 122, 74, 0.14);
+    --accent-muted: rgba(232, 122, 74, 0.06);
 
-    --text: #d1d5db;
-    --text-secondary: #9ca3af;
-    --text-heading: #f9fafb;
-    --text-inverse: #111827;
+    --text: #d4ccc5;
+    --text-secondary: #968d84;
+    --text-heading: #f5f0ea;
+    --text-inverse: #1a1009;
 
-    --bg: #0f172a;
-    --bg-panel: #1e293b;
-    --bg-input: #1e293b;
-    --bg-hover: #334155;
-    --bg-muted: #1e293b;
+    --bg: #1a1009;
+    --bg-panel: #241c12;
+    --bg-input: #2a2118;
+    --bg-hover: #332a1f;
+    --bg-muted: #2a2118;
 
-    --border: #334155;
+    --border: #3d3228;
+    --border-strong: #504334;
 
-    --error: #f87171;
-    --error-bg: rgba(248, 113, 113, 0.1);
+    --error: #e8684a;
+    --error-bg: rgba(232, 104, 74, 0.1);
 
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
+    --shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
   }
 }
 
-body {
+html, body {
   margin: 0;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  min-height: 100%;
+}
+
+body {
+  color: var(--text);
 }
 
 h1, h2, h3 {
@@ -89,39 +101,48 @@ p {
   margin: 0;
 }
 
-button {
-  cursor: pointer;
-  font-family: inherit;
+button, input, textarea, select {
+  font: inherit;
 }
 
-input {
-  font-family: inherit;
+button {
+  color: inherit;
+  cursor: pointer;
+}
+
+img {
+  max-width: 100%;
 }
 
 input[type="range"] {
   accent-color: var(--accent);
 }
 
+#app {
+  min-height: 100vh;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 6px 14px;
+  padding: 0.55rem 0.9rem;
   border-radius: var(--radius-sm);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 0.85rem;
+  font-weight: 600;
   border: 1px solid var(--border);
   background: var(--bg-panel);
-  color: var(--text);
-  transition: background 0.15s, border-color 0.15s;
+  color: var(--text-heading);
+  transition: background 120ms ease, border-color 120ms ease;
 }
 
 .btn:hover:not(:disabled) {
+  border-color: var(--border-strong);
   background: var(--bg-hover);
 }
 
 .btn:disabled {
-  opacity: 0.4;
+  opacity: 0.35;
   cursor: default;
 }
 
@@ -137,7 +158,7 @@ input[type="range"] {
 }
 
 .dimmed {
-  opacity: 0.5;
+  opacity: 0.4;
   pointer-events: none;
-  transition: opacity 0.2s;
+  transition: opacity 0.15s;
 }

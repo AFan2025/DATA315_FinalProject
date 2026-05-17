@@ -37,6 +37,18 @@ with open(os.path.join(DATA_PATH, "image_urls.json")) as f:
 
 vocab_index = {word: i for i, word in enumerate(vocab)}
 
+# --- precomputed dataset statistics (matches demo.ipynb) ---
+
+splice_weights.eliminate_zeros()
+splice_csr = splice_weights.tocsr()
+
+dataset_freq_per_concept = np.array((splice_csr > 0).mean(axis=0)).flatten()
+
+top25_weight_threshold = np.percentile(concept_frequencies, 75)
+top25pct_mask = concept_frequencies >= top25_weight_threshold
+
+SEARCH_K = 1000
+
 
 class Image(BaseModel):
     image_id: str
@@ -46,9 +58,9 @@ class Image(BaseModel):
 
 class Concept(BaseModel):
     concept: str
-    mean_weight: float
+    freq_retrieved: float
     base_freq: float
-    ratio: Optional[float] = None
+    freq_ratio: Optional[float] = None
 
 class ConceptWeights(BaseModel):
     concept_weights: dict
@@ -77,19 +89,21 @@ def build_query_vector(input_weights: ConceptWeights) -> np.ndarray:
     return q / norm
 
 
-def retrieve(concept_weights: ConceptWeights, k: int = 20, threshold: float = 0.25):
+def retrieve(concept_weights: ConceptWeights, page_size: int = 24, threshold: float = 0.22, offset: int = 0):
+    """Top-k FAISS results filtered to cosine similarity >= threshold (matches demo.ipynb)."""
     q = build_query_vector(concept_weights)
 
-    lims, distances, indices = faiss_index.range_search(q[None], threshold)
-    all_idx = indices[lims[0]:lims[1]]
-    all_scores = distances[lims[0]:lims[1]]
+    distances, indices = faiss_index.search(q[None], SEARCH_K)
+    distances = distances[0]
+    indices = indices[0]
 
-    order = np.argsort(all_scores)[::-1]
-    all_idx = all_idx[order]
-    all_scores = all_scores[order]
+    mask = distances >= threshold
+    all_scores = distances[mask]
+    all_idx = indices[mask]
 
+    page_end = min(offset + page_size, len(all_scores))
     display_results = []
-    for score, idx in zip(all_scores[:k], all_idx[:k]):
+    for score, idx in zip(all_scores[offset:page_end], all_idx[offset:page_end]):
         img_id = int(image_ids[idx])
         display_results.append(Image(
             image_id=str(img_id),
@@ -104,34 +118,39 @@ def retrieve(concept_weights: ConceptWeights, k: int = 20, threshold: float = 0.
     }
 
 
-def top_concepts(retrieved_rows: list[int], query_concepts: ConceptWeights, top_n: int = 15) -> List[Concept]:
-    """Top concepts by mean SpLiCE weight in the retrieved set."""
+def top_concepts(retrieved_rows: list[int], query_concepts: ConceptWeights, top_n: int = 20) -> List[Concept]:
+    """Frequency-based enrichment — fraction of retrieved images containing each concept (matches demo.ipynb)."""
     sub = splice_weights[retrieved_rows].toarray()
-    mean_w = sub.mean(axis=0)
+    freq = (sub > 0).mean(axis=0)
 
     for concept in query_concepts.concept_weights:
         if concept in vocab_index:
-            mean_w[vocab_index[concept]] = 0.0
+            freq[vocab_index[concept]] = 0.0
+    freq[top25pct_mask] = 0.0
 
-    top = mean_w.argsort()[::-1][:top_n]
+    top_idx = freq.argsort()[::-1][:top_n]
     out = []
-    for i in top:
-        if mean_w[i] <= 0:
+    for i in top_idx:
+        if freq[i] <= 0:
             break
-        base = float(concept_frequencies[i])
-        ratio = float(mean_w[i] / base) if base > 0 else None
+        base = float(dataset_freq_per_concept[i])
         out.append(Concept(
             concept=vocab[i],
-            mean_weight=float(mean_w[i]),
+            freq_retrieved=float(freq[i]),
             base_freq=base,
-            ratio=ratio,
+            freq_ratio=float(freq[i] / base) if base > 0 else None,
         ))
     return out
 
 
 @app.post("/search", response_model=SearchResponse)
-async def search(input_weights: ConceptWeights, k: int = 20, threshold: float = 0.25):
-    result = retrieve(input_weights, k, threshold)
+async def search(
+    input_weights: ConceptWeights,
+    k: int = 24,
+    threshold: float = 0.22,
+    offset: int = 0,
+):
+    result = retrieve(input_weights, k, threshold, offset)
     concepts = top_concepts(result["all_rows"], input_weights) if result["all_rows"] else []
     return SearchResponse(
         display_results=result["display_results"],
