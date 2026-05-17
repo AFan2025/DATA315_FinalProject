@@ -9,7 +9,7 @@ import json
 
 app = FastAPI(title="slice-backend-api", version="1.0.0")
 
-DATA_PATH = "/Users/alexfan/Desktop/Root/UCHI/Masters/Q3/Data-Interaction/DATA315_Final/splice-vis-website/data/"
+DATA_PATH = "data"
 
 clip_embeddings     = np.load(os.path.join(DATA_PATH, "clip_embeddings.npy"))
 concept_embeddings  = np.load(os.path.join(DATA_PATH, "concept_embeddings.npy"))
