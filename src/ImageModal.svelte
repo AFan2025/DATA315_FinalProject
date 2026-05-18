@@ -2,6 +2,10 @@
   let {
     image = null,
     onClose = () => {},
+    onPrev = () => {},
+    onNext = () => {},
+    hasPrev = false,
+    hasNext = false,
   } = $props();
 
   function handleBackdropClick(e) {
@@ -10,6 +14,8 @@
 
   function handleKeydown(e) {
     if (e.key === 'Escape') onClose();
+    else if (e.key === 'ArrowLeft' && hasPrev) onPrev();
+    else if (e.key === 'ArrowRight' && hasNext) onNext();
   }
 </script>
 
@@ -18,6 +24,8 @@
 <div class="modal-backdrop" onclick={handleBackdropClick} onkeydown={handleKeydown} role="dialog" aria-modal="true" tabindex="-1">
   <div class="modal-card">
     <button class="close-btn" onclick={onClose} aria-label="Close">×</button>
+    <button class="nav-btn nav-prev" onclick={onPrev} disabled={!hasPrev} aria-label="Previous image">‹</button>
+    <button class="nav-btn nav-next" onclick={onNext} disabled={!hasNext} aria-label="Next image">›</button>
 
     <div class="modal-media">
       {#if image?.url}
@@ -85,6 +93,38 @@
     cursor: pointer;
     z-index: 1;
   }
+
+  .nav-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 2.8rem;
+    height: 2.8rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.9);
+    color: var(--text-heading);
+    font-size: 1.8rem;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 120ms ease, opacity 120ms ease;
+  }
+
+  .nav-btn:disabled {
+    opacity: 0.2;
+    cursor: default;
+  }
+
+  .nav-btn:not(:disabled):hover {
+    background: var(--bg-hover);
+  }
+
+  .nav-prev { left: 1rem; }
+  .nav-next { right: 1rem; }
 
   .modal-media {
     background: linear-gradient(135deg, #f5f0ea, #ebe4db);

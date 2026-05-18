@@ -6,7 +6,7 @@
   import ImageModal from './ImageModal.svelte';
   import { search } from './lib/api.js';
 
-  const PAGE_SIZE = 24;
+  const PAGE_SIZE = 15;
 
   let results = $state([]);
   let concepts = $state([]);
@@ -23,6 +23,8 @@
   let pendingConcept = $state('');
   /** Image to show in full-screen modal */
   let selectedImage = $state(null);
+  /** Show info overlay */
+  let showInfo = $state(false);
 
   let totalPages = $derived(Math.max(1, Math.ceil(totalAboveThreshold / PAGE_SIZE)));
 
@@ -96,8 +98,41 @@
     pendingConcept = '';
   }
 
+  let selectedLocalIndex = $derived(results.findIndex(img => img.image_id === selectedImage?.image_id));
+  let selectedGlobalIndex = $derived(selectedImage ? currentPage * PAGE_SIZE + selectedLocalIndex : -1);
+  let hasPrev = $derived(selectedGlobalIndex > 0);
+  let hasNext = $derived(selectedGlobalIndex >= 0 && selectedGlobalIndex < totalAboveThreshold - 1);
+
+  /** After a page load triggered by modal navigation, select first or last image */
+  let pendingSelectPosition = $state(null);
+
+  $effect(() => {
+    if (pendingSelectPosition && results.length > 0) {
+      selectedImage = pendingSelectPosition === 'first' ? results[0] : results[results.length - 1];
+      pendingSelectPosition = null;
+    }
+  });
+
   function handleImageClick(img) {
     selectedImage = img;
+  }
+
+  async function handlePrev() {
+    if (selectedLocalIndex > 0) {
+      selectedImage = results[selectedLocalIndex - 1];
+    } else if (currentPage > 0) {
+      pendingSelectPosition = 'last';
+      await handlePageChange(currentPage - 1);
+    }
+  }
+
+  async function handleNext() {
+    if (selectedLocalIndex < results.length - 1) {
+      selectedImage = results[selectedLocalIndex + 1];
+    } else if (currentPage < totalPages - 1) {
+      pendingSelectPosition = 'first';
+      await handlePageChange(currentPage + 1);
+    }
   }
 
   function closeModal() {
@@ -111,11 +146,25 @@
       <p class="eyebrow">Human-In-The-Loop Dataset Auditing</p>
       <h1>SpLiCE Auditor</h1>
     </div>
-    <p class="intro">
-      Build a query in the learned representation space, inspect the retrieved image subset,
-      and surface candidate associations worth auditing relative to the dataset baseline.
-    </p>
+    <button class="info-btn" onclick={() => showInfo = true} aria-label="About this tool">?</button>
   </header>
+
+  {#if showInfo}
+    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+    <div class="info-backdrop" onclick={() => showInfo = false}>
+      <div class="info-panel" onclick={(e) => e.stopPropagation()}>
+        <button class="info-close" onclick={() => showInfo = false} aria-label="Close">×</button>
+        <h3>How SpLiCE Auditor Works</h3>
+        <p><strong>SpLiCE</strong> (Sparse Linear Concept Embeddings) decomposes CLIP image embeddings into weighted sums of human-interpretable concept vectors drawn from a large vocabulary. Each image is represented not as an opaque 512-dimensional vector, but as a sparse combination of concepts like <em>cat</em>, <em>outdoor</em>, or <em>formal attire</em>.</p>
+        <h4>Query Builder</h4>
+        <p>You construct a query by selecting concepts and adjusting their relative weights. These are combined into a single embedding via weighted sum and L2-normalized. The backend performs a FAISS nearest-neighbor search over the dataset using cosine similarity, returning images whose SpLiCE embeddings are closest to your query.</p>
+        <h4>Retrieved Images</h4>
+        <p>Images shown exceed a cosine similarity threshold of 0.22 against your query vector. Each card displays its similarity score. You can page through results and click any image to inspect it.</p>
+        <h4>Related Concepts</h4>
+        <p>For the retrieved subset, the tool computes how frequently each concept appears relative to the full dataset baseline. Concepts ranked by <em>enrichment ratio</em> are overrepresented in the retrieved subset compared to the dataset as a whole — surfacing latent associations worth auditing. Clicking a concept adds it to your query for deeper exploration.</p>
+      </div>
+    </div>
+  {/if}
 
   <main class="workspace">
     <section class="workspace-card">
@@ -147,13 +196,9 @@
 
     <section class="workspace-card">
       <div class="card-header">
-        <p class="panel-label">Enriched Concepts</p>
-        <h2>Surface candidate associations worth auditing.</h2>
+        <p class="panel-label">Related Concepts</p>
+        <h2>Explore concept associations in retrieved images.</h2>
       </div>
-      <p class="helper-copy">
-        These concepts are unusually weighted in the retrieved image subset relative to
-        the full dataset baseline.
-      </p>
       <EnrichmentPanel
         {concepts}
         loading={isSearching}
@@ -164,7 +209,14 @@
 </div>
 
 {#if selectedImage}
-  <ImageModal image={selectedImage} onClose={closeModal} />
+  <ImageModal
+    image={selectedImage}
+    onClose={closeModal}
+    onPrev={handlePrev}
+    onNext={handleNext}
+    hasPrev={hasPrev}
+    hasNext={hasNext}
+  />
 {/if}
 
 <style>
@@ -172,16 +224,116 @@
     width: calc(100% - 24px);
     max-width: 2000px;
     margin: 0 auto;
-    padding: 20px 0 32px;
+    padding: 20px 0 16px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
 
   .page-header {
     display: flex;
     justify-content: space-between;
-    align-items: end;
+    align-items: center;
     gap: 1.5rem;
     margin-bottom: 1rem;
     flex-wrap: wrap;
+  }
+
+  .info-btn {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--bg-panel);
+    color: var(--text-secondary);
+    font-size: 1.3rem;
+    font-weight: 700;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: border-color 120ms ease, color 120ms ease;
+  }
+
+  .info-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .info-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(26, 16, 9, 0.45);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+
+  .info-panel {
+    position: relative;
+    width: min(860px, 90vw);
+    max-height: 85vh;
+    background: rgba(255, 251, 247, 0.92);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 2.5rem 3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    overflow-y: auto;
+  }
+
+  .info-close {
+    position: absolute;
+    top: 1.5rem;
+    right: 1.5rem;
+    width: 2.2rem;
+    height: 2.2rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 1.25rem;
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease;
+  }
+
+  .info-close:hover {
+    background: var(--bg-hover);
+    color: var(--text-heading);
+  }
+
+  .info-panel h3 {
+    font-size: 1.8rem;
+    color: var(--text-heading);
+    margin: 0 0 0.5rem;
+  }
+
+  .info-panel h4 {
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0.75rem 0 0;
+  }
+
+  .info-panel p {
+    font-size: 1rem;
+    line-height: 1.75;
+    color: var(--text);
+    margin: 0;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .info-panel {
+      background: rgba(28, 20, 10, 0.92);
+    }
   }
 
   .eyebrow {
@@ -216,7 +368,8 @@
     grid-template-rows: 1fr;
     gap: 0.75rem;
     align-items: stretch;
-    min-height: calc(100vh - 120px);
+    flex: 1;
+    min-height: 0;
   }
 
   .workspace-card {
@@ -229,7 +382,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    overflow-y: auto;
+    overflow: hidden;
   }
 
   .card-header {

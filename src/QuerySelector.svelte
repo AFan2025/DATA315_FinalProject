@@ -294,9 +294,7 @@
       {/each}
 
       <div class="list-footer">
-        <span class="total">Σ {totalWeight.toFixed(3)}</span>
         <div class="footer-actions">
-          <button class="btn btn-sm" type="button" onclick={normalizeWeights}>Normalize</button>
           <button class="btn btn-sm" type="button" onclick={resetAll}>Reset</button>
         </div>
       </div>
@@ -309,6 +307,8 @@
     display: flex;
     flex-direction: column;
     gap: 0.65rem;
+    flex: 1;
+    min-height: 0;
   }
 
   .search-label {
@@ -393,6 +393,9 @@
     display: flex;
     flex-direction: column;
     gap: 0.55rem;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
   }
 
   .empty-card {

@@ -20,7 +20,7 @@
     sortedConcepts.reduce((mx, c) => {
       const val = sortBy === 'freq_ratio' ? (c.freq_ratio ?? 0) : (c.freq_retrieved ?? 0);
       return val > mx ? val : mx;
-    }, 1)
+    }, 0)
   );
 </script>
 
@@ -50,7 +50,7 @@
     </div>
 
     <div class="concept-list" class:dimmed={loading}>
-      {#each sortedConcepts as c (c.concept)}
+      {#each sortedConcepts as c, i (c.concept)}
         {@const val = sortBy === 'freq_ratio' ? (c.freq_ratio ?? 0) : (c.freq_retrieved ?? 0)}
         {@const pct = Math.min((val / maxBar) * 100, 100)}
         <button
@@ -61,6 +61,7 @@
           <div class="bar-track">
             <div class="bar-fill" style="width: {pct}%"></div>
           </div>
+          <span class="bar-index">{i + 1}</span>
           <span class="bar-label">{c.concept}</span>
           <span class="bar-value">
             {#if sortBy === 'freq_ratio'}
@@ -183,6 +184,17 @@
     background: var(--accent-light);
     border-radius: var(--radius-xs);
     transition: width 350ms ease;
+  }
+
+  .bar-index {
+    position: relative;
+    z-index: 1;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    min-width: 1.4rem;
+    text-align: right;
   }
 
   .bar-label {

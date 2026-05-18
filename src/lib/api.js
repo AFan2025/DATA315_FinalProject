@@ -4,7 +4,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api';
  * @param {Record<string, number>} conceptWeights
  * @param {{ k?: number, threshold?: number, offset?: number, signal?: AbortSignal }} [opts]
  */
-export async function search(conceptWeights, { k = 20, threshold = 0.25, offset = 0, signal } = {}) {
+export async function search(conceptWeights, { k = 20, threshold = 0.22, offset = 0, signal } = {}) {
   const res = await fetch(
     `${API_BASE}/search?k=${k}&threshold=${threshold}&offset=${offset}`,
     {

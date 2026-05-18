@@ -39,7 +39,7 @@
   <div class="panel-frame">
     {#if loading && images.length === 0}
       <div class="image-grid">
-        {#each { length: 24 } as _}
+        {#each { length: 15 } as _}
           <div class="skeleton-card"></div>
         {/each}
       </div>
@@ -98,6 +98,7 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    height: 100%;
   }
 
   .panel-top {
@@ -151,18 +152,22 @@
   }
 
   .panel-frame {
-    min-height: 16rem;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .image-grid {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(5, 1fr);
+    grid-auto-rows: 1fr;
     gap: 0.6rem;
+    height: 100%;
   }
 
   @media (max-width: 1100px) {
     .image-grid {
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(3, 1fr);
     }
   }
 
@@ -181,6 +186,9 @@
     padding: 0;
     text-align: left;
     transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
   }
 
   .img-card:hover {
@@ -190,7 +198,8 @@
   }
 
   .img-wrap {
-    aspect-ratio: 1;
+    flex: 1;
+    min-height: 0;
     background: var(--bg-muted);
     overflow: hidden;
     display: flex;
@@ -242,7 +251,6 @@
 
   /* skeleton — matches the 6-col grid */
   .skeleton-card {
-    aspect-ratio: 1;
     border-radius: var(--radius-sm);
     background: linear-gradient(90deg, var(--bg-muted) 25%, var(--bg-hover) 50%, var(--bg-muted) 75%);
     background-size: 200% 100%;
@@ -250,10 +258,10 @@
   }
 
   @media (max-width: 1100px) {
-    .skeleton-card:nth-child(n+17) { display: none; }
+    .skeleton-card:nth-child(n+10) { display: none; }
   }
   @media (max-width: 768px) {
-    .skeleton-card:nth-child(n+9) { display: none; }
+    .skeleton-card:nth-child(n+7) { display: none; }
   }
 
   @keyframes shimmer {
