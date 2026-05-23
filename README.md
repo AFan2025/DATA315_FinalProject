@@ -1,47 +1,93 @@
 # DATA315_FinalProject
 Alex, Arnav, Karsten, Gabriel DATA 315 Data Interaction Spring 2026 Final Project
 
+# DEPLOYMENT INSTRUCTIONS
 
-# Svelte + Vite
+The data should all be integrated within the Github. No additional steps are needed.
 
-This template should help get you started developing with Svelte in Vite.
+## Environment Set up
+To initialize the Python environment, run the following from the project root. All Python libraries are already included in pyproject.toml.
 
-## Recommended IDE Setup
+```bash
+uv sync
+source .venv/bin/activate
+```
 
-[VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode).
+To install the frontend dependencies, run:
 
-## Need an official Svelte framework?
+```bash
+npm install
+```
 
-Check out [SvelteKit](https://github.com/sveltejs/kit#readme), which is also powered by Vite. Deploy anywhere with its serverless-first approach and adapt to various platforms, with out of the box support for TypeScript, SCSS, and Less, and easily-added support for mdsvex, GraphQL, PostCSS, Tailwind CSS, and more.
+## Backend Start
 
-## Technical considerations
+Run the backend from the project root. This starts the FastAPI server on http://localhost:8000.
 
-**Why use this over SvelteKit?**
+```bash
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
 
-- It brings its own routing solution which might not be preferable for some users.
-- It is first and foremost a framework that just happens to use Vite under the hood, not a Vite app.
+If you prefer not to activate the virtual environment manually, you can run the same server with:
 
-This template contains as little as possible to get started with Vite + Svelte, while taking into account the developer experience with regards to HMR and intellisense. It demonstrates capabilities on par with the other `create-vite` templates and is a good starting point for beginners dipping their toes into a Vite + Svelte project.
+```bash
+uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
 
-Should you later need the extended capabilities and extensibility provided by SvelteKit, the template has been structured similarly to SvelteKit so that it is easy to migrate.
+## Frontend Start
 
-**Why include `.vscode/extensions.json`?**
+Run the frontend development server from the project root:
 
-Other templates indirectly recommend extensions via the README, but this file allows VS Code to prompt the user to install the recommended extension upon opening the project.
+```bash
+npm run dev
+```
 
-**Why enable `checkJs` in the JS template?**
+This starts the Vite app, usually at http://localhost:5173. The frontend proxies `/api` requests to the backend at http://localhost:8000.
 
-It is likely that most cases of changing variable types in runtime are likely to be accidental, rather than deliberate. This provides advanced typechecking out of the box. Should you like to take advantage of the dynamically-typed nature of JavaScript, it is trivial to change the configuration.
+## Frontend Build
 
-**Why is HMR not preserving my local component state?**
+To create a production frontend build, run:
 
-HMR state preservation comes with a number of gotchas! It has been disabled by default in both `svelte-hmr` and `@sveltejs/vite-plugin-svelte` due to its often surprising behavior. You can read the details [here](https://github.com/sveltejs/svelte-hmr/tree/master/packages/svelte-hmr#preservation-of-local-state).
+```bash
+npm run build
+```
 
-If you have state that's important to retain within a component, consider creating an external store which would not be replaced by HMR.
+The production files will be written to the `dist/` directory.
 
-```js
-// store.js
-// An extremely simple external store
-import { writable } from 'svelte/store'
-export default writable(0)
+To preview the production build locally, run:
+
+```bash
+npm run preview
+```
+
+## Backend Build Notes
+
+The backend does not use `npm run build`. It is a FastAPI application that runs directly with `uvicorn`.
+
+For local development, use:
+
+```bash
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+For a production-style backend launch without auto-reload, use:
+
+```bash
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+## Recommended Local Workflow
+
+Use two terminals from the project root:
+
+Terminal 1:
+
+```bash
+source .venv/bin/activate
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Terminal 2:
+
+```bash
+npm run dev
 ```
